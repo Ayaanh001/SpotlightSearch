@@ -1,10 +1,14 @@
 package com.paraskcd.spotlightsearch
 
+import android.Manifest
 import android.app.SearchManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import android.content.Intent
+import androidx.compose.material.icons.filled.Warning
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.paraskcd.spotlightsearch.icons.Calculate
@@ -21,9 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import androidx.core.net.toUri
-import androidx.compose.material.icons.filled.Warning
-import android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
 import com.paraskcd.spotlightsearch.data.entities.GlobalSearchConfigEntity
 import com.paraskcd.spotlightsearch.data.repo.AppUsageRepository
 import com.paraskcd.spotlightsearch.data.repo.GlobalSearchConfigRepository
@@ -55,6 +56,7 @@ class SearchViewModel @Inject constructor(
     private val settingsSearchProvider: SettingsSearchProvider,
     private val globalConfigRepo: GlobalSearchConfigRepository
 ) : ViewModel() {
+
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
     private var searchJob: Job? = null
@@ -78,6 +80,9 @@ class SearchViewModel @Inject constructor(
     private val globalConfig = globalConfigRepo.config
         .stateIn(viewModelScope, SharingStarted.Eagerly, GlobalSearchConfigEntity())
 
+    // Added: SharedPreferences for saving/restoring last query
+    private val prefs = context.getSharedPreferences("search_prefs", Context.MODE_PRIVATE)
+
     init {
         viewModelScope.launch {
             globalConfigRepo.ensure()
@@ -90,10 +95,21 @@ class SearchViewModel @Inject constructor(
                 if (_query.value.isBlank()) updateResults()
             }
         }
+
+        // Added: Restore last query when ViewModel is created
+        val lastQuery = prefs.getString("last_query", "") ?: ""
+        if (lastQuery.isNotBlank()) {
+            _query.value = lastQuery
+            updateResults()
+        }
     }
 
     fun onQueryChanged(newQuery: String) {
         _query.value = newQuery
+
+        // Added: Save query so it persists after app close
+        prefs.edit().putString("last_query", newQuery).apply()
+
         updateResults()
     }
 
@@ -103,7 +119,7 @@ class SearchViewModel @Inject constructor(
                 SearchResultType.APP,
                 SearchResultType.CONTACT,
                 SearchResultType.FILE,
-                SearchResultType.SETTINGS-> true
+                SearchResultType.SETTINGS -> true
                 else -> false
             }
         }
@@ -147,25 +163,32 @@ class SearchViewModel @Inject constructor(
             }
 
             val needsContactPermission = contactSearchProvider.requiresPermission()
-
             val permissionPrompt = buildList {
                 if (needsContactPermission) {
                     add(SearchResult(title = "Permissions", isHeader = true, onClick = {}))
                 }
                 if (needsContactPermission) {
-                    add(SearchResult(
-                        title = "Allow contact access",
-                        subtitle = "Required to search contacts",
-                        iconVector = Icons.Filled.Warning,
-                        onClick = {
-                            val intent = Intent(ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = "package:${context.packageName}".toUri()
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        },
-                        searchResultType = SearchResultType.PERMISSION
-                    ))
+                    add(
+                        SearchResult(
+                            title = "Allow contact access",
+                            subtitle = "Required to search contacts",
+                            iconVector = Icons.Filled.Warning,
+                            onClick = {
+                                val permissionCheck = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.READ_CONTACTS
+                                )
+                                if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+                                    // Already granted
+                                } else {
+                                    val intent = Intent(context, PermissionRequestActivity::class.java)
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                }
+                            },
+                            searchResultType = SearchResultType.PERMISSION
+                        )
+                    )
                 }
             }
             _results.value = permissionPrompt
@@ -191,7 +214,6 @@ class SearchViewModel @Inject constructor(
                 _results.update { settingsResults + it }
             }
 
-            // Math/Date/Unit/Temp evaluation
             val mathResult = mathEvaluationProvider.evaluate(query)
             mathResult?.let {
                 _results.update { prev ->
@@ -224,19 +246,21 @@ class SearchViewModel @Inject constructor(
 
             val webResults = mutableListOf<SearchResult>()
             webResults.add(SearchResult(title = "Web", isHeader = true, onClick = {}))
-            webResults.add(SearchResult(
-                title = "Search \"$query\" on the web",
-                subtitle = "Web Search",
-                iconVector = Icons.Filled.Search,
-                onClick = {
-                    val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
-                        putExtra(SearchManager.QUERY, query)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                },
-                searchResultType = SearchResultType.WEB
-            ))
+            webResults.add(
+                SearchResult(
+                    title = "Search \"$query\" on the web",
+                    subtitle = "Web Search",
+                    iconVector = Icons.Filled.Search,
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                            putExtra(SearchManager.QUERY, query)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    },
+                    searchResultType = SearchResultType.WEB
+                )
+            )
             _results.update { it + webResults }
 
             translationDeferred.invokeOnCompletion {
@@ -274,7 +298,6 @@ class SearchViewModel @Inject constructor(
                 }
 
                 if (calculatorItem != null) {
-                    // Remove previous local calculator results
                     _results.update { prev -> prev.filterNot { it.searchResultType == SearchResultType.CALCULATOR || (it.isHeader && it.title == "Calculator") } }
                     extra.clear()
                     extra.add(SearchResult(title = "Calculator", isHeader = true, onClick = {}))

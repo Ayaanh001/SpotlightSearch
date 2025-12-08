@@ -2,34 +2,21 @@ package com.paraskcd.spotlightsearch.ui.screens
 
 import android.content.Intent
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.LocalActivity
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import kotlinx.coroutines.flow.debounce
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import com.paraskcd.spotlightsearch.SearchViewModel
-import kotlinx.coroutines.FlowPreview
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.shape.CircleShape
@@ -41,19 +28,38 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.paraskcd.spotlightsearch.SearchViewModel
 import com.paraskcd.spotlightsearch.SettingsActivity
 import com.paraskcd.spotlightsearch.ui.components.SearchBar
 import com.paraskcd.spotlightsearch.ui.components.SearchResultList
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.android.awaitFrame
+import kotlinx.coroutines.flow.debounce
 
-@OptIn(FlowPreview::class, ExperimentalLayoutApi::class)
+@OptIn(FlowPreview::class)
 @Composable
 fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
-    var localQuery by remember { mutableStateOf("") }
+    val query by viewModel.query.collectAsState()
+    var localQuery by remember { mutableStateOf(TextFieldValue(query, TextRange(query.length))) }
     val results by viewModel.results.collectAsState()
 
     val focusRequester = remember { FocusRequester() }
@@ -82,16 +88,29 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
         }
     }
 
-    LaunchedEffect(Unit) {
-        awaitFrame()
-        awaitFrame()
+    LaunchedEffect(query) {
+        awaitFrame(); awaitFrame()
         focusRequester.requestFocus()
-        awaitFrame()
         awaitFrame()
     }
 
+    val isFirstLaunch = remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        if (query.isNotEmpty() && isFirstLaunch.value) {
+            // Select all text only on first launch
+            localQuery = TextFieldValue(
+                text = query,
+                selection = TextRange(0, query.length)
+            )
+        } else if (query.isEmpty()) {
+            localQuery = TextFieldValue("", TextRange(0))
+        }
+        isFirstLaunch.value = false
+    }
+
     LaunchedEffect(localQuery) {
-        snapshotFlow { localQuery }
+        snapshotFlow { localQuery.text }
             .debounce(400)
             .collect { debouncedText ->
                 viewModel.onQueryChanged(debouncedText)
@@ -101,14 +120,9 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
     val isImeVisible = imeBottom > 0.dp
     val reduceFactor = 0.85f
     val minGap = 8.dp
+    val bottomPadding = if (isImeVisible) (imeBottom * (1 - reduceFactor)).coerceAtLeast(minGap) else navBottom
 
-    val bottomPadding = if (isImeVisible) {
-        (imeBottom * (1 - reduceFactor)).coerceAtLeast(minGap)
-    } else {
-        navBottom
-    }
-
-    Scaffold (
+    Scaffold(
         bottomBar = {
             Row(
                 modifier = Modifier
@@ -120,13 +134,15 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
             ) {
                 SearchBar(
                     query = localQuery,
-                    onQueryChanged = { localQuery = it },
+                    onQueryChanged = {
+                        localQuery = it
+                    },
                     onClear = {
-                        localQuery = ""
+                        localQuery = TextFieldValue("", TextRange(0))
                     },
                     focusRequester = focusRequester,
                     onSearchImeAction = {
-                        viewModel.onSearch(localQuery)
+                        viewModel.onSearch(localQuery.text)
                         activity?.finish()
                     },
                     supportsBlur = supportsBlur,
@@ -134,9 +150,7 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
                 )
 
                 Surface(
-                    onClick = {
-                        activity?.startActivity(Intent(activity, SettingsActivity::class.java))
-                    },
+                    onClick = { activity?.startActivity(Intent(activity, SettingsActivity::class.java)) },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceBright.copy(alpha = if (supportsBlur) 0.65f else 1f)
                 ) {
@@ -144,16 +158,12 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(100.dp)
-                            )
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(100.dp))
                             .padding(8.dp)
                             .size(40.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
+                            imageVector = Icons.Filled.Settings,
                             contentDescription = "Settings",
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier
@@ -164,9 +174,7 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
                 }
 
                 Surface(
-                    onClick = {
-                        activity?.finish()
-                    },
+                    onClick = { activity?.finish() },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceBright.copy(alpha = if (supportsBlur) 0.65f else 1f)
                 ) {
@@ -174,11 +182,7 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(100.dp)
-                            )
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(100.dp))
                             .padding(8.dp)
                             .size(40.dp),
                     ) {
@@ -206,7 +210,9 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
         ) {
             SearchResultList(
                 results = results,
-                onQueryChanged = { localQuery = it },
+                onQueryChanged = {
+                    localQuery = TextFieldValue(it, TextRange(it.length))
+                },
                 supportsBlur = supportsBlur
             )
         }
