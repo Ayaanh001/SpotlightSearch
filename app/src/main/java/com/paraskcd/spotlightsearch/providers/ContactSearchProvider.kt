@@ -79,7 +79,7 @@ class ContactSearchProvider @Inject constructor(
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
             }
-            actions += ActionButton(label = "SMS", iconVector = SMS) {
+            actions += ActionButton(label = "Sms", iconVector = SMS) {
                 val intent = Intent(Intent.ACTION_SENDTO).apply {
                     data = Uri.parse("smsto:$number")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -89,7 +89,7 @@ class ContactSearchProvider @Inject constructor(
             if (waInstalled) {
                 val sanitized = number.replace("[^\\d+]".toRegex(), "")
                 actions += ActionButton(
-                    label = "WhatsApp",
+                    label = "WA",
                     onClick = {
                         val intent = Intent(
                             Intent.ACTION_VIEW,

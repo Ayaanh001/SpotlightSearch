@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
@@ -254,7 +256,7 @@ fun SearchResultItem(result: SearchResult, onQueryChanged: (String) -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        result.actionButtons.forEach { action ->
+                        buttons.forEach { action ->
                             Button(
                                 onClick = {
                                     action.onClick()
@@ -266,14 +268,30 @@ fun SearchResultItem(result: SearchResult, onQueryChanged: (String) -> Unit) {
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.5f),
                                     contentColor = MaterialTheme.colorScheme.onSurface
-                                )
+                                ),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.CenterHorizontally)
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.fillMaxWidth() // Left-align contents
                                 ) {
-                                    action.iconVector?.let { Icon(it, action.label, modifier = Modifier.size(25.dp) ) }
-                                    Text(action.label, maxLines = 1)
+                                    action.iconVector?.let {
+                                        Icon(
+                                            it,
+                                            contentDescription = action.label,
+                                            modifier = Modifier.size(20.dp) // Make icon similar size as text
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                    }
+
+                                    Text(
+                                        text = action.label,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontSize = 15.sp // You can adjust this font size
+                                    )
                                 }
                             }
                         }
