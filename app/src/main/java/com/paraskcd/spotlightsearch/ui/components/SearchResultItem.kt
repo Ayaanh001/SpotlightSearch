@@ -274,13 +274,13 @@ fun SearchResultItem(result: SearchResult, onQueryChanged: (String) -> Unit) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxWidth() // Left-align contents
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     action.iconVector?.let {
                                         Icon(
                                             it,
                                             contentDescription = action.label,
-                                            modifier = Modifier.size(20.dp) // Make icon similar size as text
+                                            modifier = Modifier.size(20.dp) // icon size
                                         )
                                         Spacer(Modifier.width(6.dp))
                                     }
@@ -290,7 +290,7 @@ fun SearchResultItem(result: SearchResult, onQueryChanged: (String) -> Unit) {
                                         maxLines = 1,
                                         softWrap = false,
                                         overflow = TextOverflow.Ellipsis,
-                                        fontSize = 15.sp // You can adjust this font size
+                                        fontSize = 15.sp // font size
                                     )
                                 }
                             }
