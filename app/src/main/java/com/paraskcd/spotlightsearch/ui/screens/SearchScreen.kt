@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
@@ -70,6 +71,8 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
 
     val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    val iconTintColorArgb = MaterialTheme.colorScheme.primary.toArgb()
 
     DisposableEffect(lifecycleOwner) {
         val callback = object : OnBackPressedCallback(true) {
@@ -213,7 +216,10 @@ fun SearchScreen(viewModel: SearchViewModel, supportsBlur: Boolean) {
                 onQueryChanged = {
                     localQuery = TextFieldValue(it, TextRange(it.length))
                 },
-                supportsBlur = supportsBlur
+                supportsBlur = supportsBlur,
+                resolveThemedAppIcon = { pkg ->
+                    viewModel.getAppIcons(pkg, dynamicColor = iconTintColorArgb)
+                }
             )
         }
     }

@@ -106,10 +106,8 @@ class SearchViewModel @Inject constructor(
 
     fun onQueryChanged(newQuery: String) {
         _query.value = newQuery
-
         // Added: Save query so it persists after app close
         prefs.edit().putString("last_query", newQuery).apply()
-
         updateResults()
     }
 
@@ -322,6 +320,7 @@ class SearchViewModel @Inject constructor(
             }
         }
     }
+    fun getAppIcons(pkg: String, dynamicColor: Int? = null) = appRepository.getAppIcon(packageName = pkg, applyDynamicColoring = true, dynamicColor = dynamicColor)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun <T> Deferred<T>.getCompletedOrNull(): T? =

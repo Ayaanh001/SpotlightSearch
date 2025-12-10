@@ -1,5 +1,6 @@
 package com.paraskcd.spotlightsearch.ui.components
 
+import android.graphics.drawable.Drawable
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,10 +52,21 @@ import com.paraskcd.spotlightsearch.types.SearchResult
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun SearchResultItem(result: SearchResult, onQueryChanged: (String) -> Unit) {
+fun SearchResultItem(
+    result: SearchResult,
+    onQueryChanged: (String) -> Unit,
+    resolveThemedAppIcon: ((String) -> Drawable?)?
+) {
     val activity = LocalActivity.current
     val isCompact = result.displayMode == SearchResultDisplayMode.COMPACT
     var expanded by remember { mutableStateOf(false) }
+
+    val themedIcon = remember(result.icon, result.subtitle) {
+        val pkg = result.subtitle
+        if (result.icon != null && !pkg.isNullOrBlank()) {
+            resolveThemedAppIcon?.invoke(pkg)
+        } else null
+    }
 
     if (isCompact && !result.isHeader) {
         Column(
@@ -79,10 +92,10 @@ fun SearchResultItem(result: SearchResult, onQueryChanged: (String) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            val icon = result.icon
-            if (icon != null) {
+            val iconToShow = themedIcon ?: result.icon
+            if (iconToShow != null) {
                 Image(
-                    painter = rememberDrawablePainter(icon),
+                    painter = rememberDrawablePainter(iconToShow),
                     contentDescription = result.title,
                     modifier = Modifier
                         .width(54.dp)
@@ -197,7 +210,7 @@ fun SearchResultItem(result: SearchResult, onQueryChanged: (String) -> Unit) {
                     ),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    result.icon?.let {
+                    (themedIcon ?: result.icon)?.let {
                         Image(
                             painter = rememberDrawablePainter(drawable = it),
                             contentDescription = null,
